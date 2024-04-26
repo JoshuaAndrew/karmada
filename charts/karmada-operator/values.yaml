@@ -64,3 +64,8 @@ operator:
     rollingUpdate:
       maxUnavailable: 0
       maxSurge: 50%
+
+env:
+  KARMADA_API_SERVER_NODEPORT: 32111
+
+

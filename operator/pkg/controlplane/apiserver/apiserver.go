@@ -18,6 +18,8 @@ package apiserver
 
 import (
 	"fmt"
+	"os"
+	"strconv"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -100,6 +102,11 @@ func createKarmadaAPIServerService(client clientset.Interface, cfg *operatorv1al
 		return fmt.Errorf("error when decoding karmadaApiserver serive: %w", err)
 	}
 
+	nodePort, enabled := enableCustomNodePort(cfg.ServiceType)
+	if enabled && len(karmadaApiserverService.Spec.Ports) > 0 {
+		karmadaApiserverService.Spec.Ports[0].NodePort = int32(nodePort)
+	}
+
 	if err := apiclient.CreateOrUpdateService(client, karmadaApiserverService); err != nil {
 		return fmt.Errorf("err when creating service for %s, err: %w", karmadaApiserverService.Name, err)
 	}
@@ -161,4 +168,22 @@ func createKarmadaAggregatedAPIServerService(client clientset.Interface, name, n
 		return fmt.Errorf("err when creating service for %s, err: %w", aggregatedAPIServerService.Name, err)
 	}
 	return nil
+}
+
+func enableCustomNodePort(serviceType corev1.ServiceType) (nodePort int, ok bool) {
+	if serviceType != corev1.ServiceTypeNodePort {
+		return
+	}
+	var err error
+	nodePortEnv := os.Getenv("KARMADA_API_SERVER_NODEPORT")
+	if nodePortEnv != "" {
+		nodePort, err = strconv.Atoi(nodePortEnv)
+		if err != nil {
+			return 0, false
+		}
+	}
+	if nodePort > 30000 && nodePort < 32767 {
+		return nodePort, true
+	}
+	return
 }
